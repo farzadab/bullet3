@@ -14,6 +14,5 @@ class MotionCaptureData(object):
   def NumFrames(self):
     return  len(self._motion_data['Frames'])
 
-  def KeyFrameDuraction(self):
-  	return self._motion_data['Frames'][0][0]
- 
+  def KeyFrameDuration(self):
+  	return self._motion_data['Frames'][0][0]  # assuming dt stays constant

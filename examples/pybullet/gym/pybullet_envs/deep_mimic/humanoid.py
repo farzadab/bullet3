@@ -212,7 +212,7 @@ class Humanoid(object):
     self.ApplyPose(pose, True, True, self._humanoid, self._pybullet_client)
 
   def CalcCycleCount(self, simTime, cycleTime):
-    phases = simTime / cycleTime;
+    phases = simTime / cycleTime
     count = math.floor(phases)
     loop = True
     #count = (loop) ? count : cMathUtil::Clamp(count, 0, 1);
@@ -221,7 +221,7 @@ class Humanoid(object):
   def SetSimTime(self, t):
     self._simTime = t
     #print("SetTimeTime time =",t)
-    keyFrameDuration = self._motion_data.KeyFrameDuraction()
+    keyFrameDuration = self._motion_data.KeyFrameDuration()
     cycleTime = keyFrameDuration*(self._motion_data.NumFrames()-1)
     #print("self._motion_data.NumFrames()=",self._motion_data.NumFrames())
     #print("cycleTime=",cycleTime)
@@ -270,7 +270,7 @@ class Humanoid(object):
     return headingOrn
 
   def GetPhase(self):
-    keyFrameDuration = self._motion_data.KeyFrameDuraction()
+    keyFrameDuration = self._motion_data.KeyFrameDuration()
     cycleTime = keyFrameDuration*(self._motion_data.NumFrames()-1)
     phase = self._simTime / cycleTime
     phase = math.fmod(phase,1.0)
@@ -594,7 +594,7 @@ class Humanoid(object):
     for j in range (num_joints):
       curr_pose_err = 0
       curr_vel_err = 0
-      w = mJointWeights[j];
+      w = mJointWeights[j]
       
       simJointInfo = self._pybullet_client.getJointStateMultiDof(self._humanoid, j)
       
