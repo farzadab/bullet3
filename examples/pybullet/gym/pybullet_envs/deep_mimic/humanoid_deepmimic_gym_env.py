@@ -97,6 +97,7 @@ class HumanoidDeepMimicGymEnv(gym.Env):
     self._humanoid.Reset()
     simTime = random.randint(0,self._motion.NumFrames()-2)
     self._humanoid.SetSimTime(simTime)
+    self._initial_frame = simTime
     pose = self._humanoid.InitializePoseFromMotionData()
     self._humanoid.ApplyPose(pose, True, True, self._humanoid._humanoid,self._pybullet_client)
 
@@ -151,7 +152,7 @@ class HumanoidDeepMimicGymEnv(gym.Env):
       #print("step:",s)
       self._pybullet_client.stepSimulation()
     self._initial_frame = self._initial_frame + self._control_time_step
-    self._humanoid.setSimTime(self._initial_frame)
+    self._humanoid.SetSimTime(self._initial_frame)
     reward = self._reward()
     done = self._termination()
     self._env_step_counter += 1
