@@ -4,6 +4,7 @@ currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentfram
 parentdir = os.path.dirname(os.path.dirname(currentdir))
 os.sys.path.insert(0,parentdir)
 
+from collections import OrderedDict
 from pybullet_utils.bullet_client import BulletClient
 import pybullet_data
 
@@ -21,34 +22,57 @@ class HumanoidPose(object):
     self._baseOrn = [0,0,0,1]
     self._baseAngVel = [0,0,0]
     
-    self._chestRot = [0,0,0,1]
-    self._chestVel = [0,0,0]
-    self._neckRot = [0,0,0,1]
-    self._neckVel = [0,0,0]
-    
-    self._rightHipRot = [0,0,0,1]
-    self._rightHipVel = [0,0,0]
-    self._rightKneeRot = [0]
-    self._rightKneeVel = [0]
-    self._rightAnkleRot = [0,0,0,1]
-    self._rightAnkleVel = [0,0,0]
-    
-    self._rightShoulderRot = [0,0,0,1]
-    self._rightShoulderVel = [0,0,0]
-    self._rightElbowRot = [0]
-    self._rightElbowVel = [0]
+    for joint_name, joint_info in humanoidJoints.items():
+      self.__SetJointRot(
+        joint_name,
+        [0, 0, 0, 1] if joint_info['spherical'] else [0]
+      )
+      self.__SetJointVel(
+        joint_name,
+        [0, 0, 0]    if joint_info['spherical'] else [0]
+      )
+  
+  def GetJointRot(self, joint_name):
+    '''Returns the rotation for joint `joint_name`
 
-    self._leftHipRot = [0,0,0,1]
-    self._leftHipVel = [0,0,0]
-    self._leftKneeRot = [0]
-    self._leftKneeVel = [0]
-    self._leftAnkleRot = [0,0,0,1]
-    self._leftAnkleVel = [0,0,0]
-    
-    self._leftShoulderRot = [0,0,0,1]
-    self._leftShoulderVel = [0,0,0]
-    self._leftElbowRot = [0]
-    self._leftElbowVel = [0]
+    The parameters are stored in the following format as attributes on the `self` object:
+      _[joint_name]Rot
+
+    For "spherical" joints, this value is represented as a unit Quaternion, e.g: [0,0,0,1]
+    For "revolute" joints, this value is represented as a list of size one, e.g: [0]
+    '''
+    if joint_name in humanoidJoints:
+      return getattr(self, '_%sRot' % joint_name)
+    else:
+      raise ValueError('accessing rotation for unknown joint "%s"' % joint_name)
+
+  def __SetJointRot(self, joint_name, value):
+    '''Sets the rotation for joint `joint_name`
+
+    This method is private, so it should not be accessed from outside the current class
+    '''
+    return setattr(self, '_%sRot' % joint_name, value)
+
+  def GetJointVel(self, joint_name):
+    '''Returns the velocity for joint `joint_name`
+
+    The parameters are stored in the following format as attributes on the `self` object:
+      _[joint_name]Vel
+
+    For "spherical" joints, this value is represented as a list of size 3, e.g: [vx, vy, vz]
+    For "revolute" joints, this value is represented as a list of size 1, e.g: [v]
+    '''
+    if joint_name in humanoidJoints:
+      return getattr(self, '_%sVel' % joint_name)
+    else:
+      raise ValueError('accessing velocity for unknown joint "%s"' % joint_name)
+
+  def __SetJointVel(self, joint_name, value):
+    '''Sets the velocity for joint `joint_name`
+
+    This method is private, so it should not be accessed from outside the current class
+    '''
+    return setattr(self, '_%sVel' % joint_name, value)
 
   def ComputeLinVel(self,posStart, posEnd, deltaTime):
     vel = [(posEnd[0]-posStart[0])/deltaTime,(posEnd[1]-posStart[1])/deltaTime,(posEnd[2]-posStart[2])/deltaTime]
@@ -79,9 +103,42 @@ class HumanoidPose(object):
     leftHipRotStart = [frameData[31],frameData[32],frameData[33],frameData[30]]
     leftAnkleRotStart = [frameData[36],frameData[37],frameData[38],frameData[35]]
     leftShoulderRotStart = [frameData[40],frameData[41],frameData[42],frameData[39]]
+  
+
+  def __ComputeSphericalRotVel(self, quatStart, quatEnd, frameFraction, keyFrameDuration, bullet_client):
+    '''This is currently a helper function for computing Slerp
+
+    Computes the spherical rotation and velocity when transitioning from `quatStart` to `quatEnd`
+    at the time `frameFraction`, assuming the transition takes total time `keyFrameDuration`.
+    '''
+    start = [quatStart[1], quatStart[2], quatStart[3], quatStart[0]]
+    end   = [quatEnd[1],   quatEnd[2],   quatEnd[3],   quatEnd[0]  ]
+    rot = bullet_client.getQuaternionSlerp(start, end, frameFraction)
+    vel = self.ComputeAngVel(start, end, keyFrameDuration, bullet_client)
+    return rot, vel
+
+  def __ComputeLinearRotVel(self, start, end, frameFraction, keyFrameDuration):
+    '''This is a helper function for computing Slerp
+
+    Computes the linear rotation and velocity when transitioning from angle `start` to `end`
+    at the time `frameFraction`, assuming the transition takes total time `keyFrameDuration`.
+    '''
+    rot = [start + frameFraction * (end - start)]
+    vel = [(end - start) / keyFrameDuration]
+    return rot, vel
     
-    
-  def Slerp(self, frameFraction, frameData, frameDataNext,bullet_client ):
+  def Slerp(self, frameFraction, frameData, frameDataNext, bullet_client):
+    '''
+    Sets a set of attributes on the `self` object, including:
+      _basePose
+      _baseLinVel
+      _baseOrn
+      _baseAngVel
+      _[bodypart]Rot
+      _[bodypart]Vel
+
+    TODO: why not create a new object and make this a static method?
+    '''
     keyFrameDuration = frameData[0]
     basePos1Start = [frameData[1],frameData[2],frameData[3]]
     basePos1End = [frameDataNext[1],frameDataNext[2],frameDataNext[3]]
@@ -91,74 +148,65 @@ class HumanoidPose(object):
     self._baseLinVel = self.ComputeLinVel(basePos1Start,basePos1End, keyFrameDuration)
     baseOrn1Start = [frameData[5],frameData[6], frameData[7],frameData[4]]
     baseOrn1Next = [frameDataNext[5],frameDataNext[6], frameDataNext[7],frameDataNext[4]]
-    self._baseOrn = bullet_client.getQuaternionSlerp(baseOrn1Start,baseOrn1Next,frameFraction)
-    self._baseAngVel = self.ComputeAngVel(baseOrn1Start,baseOrn1Next, keyFrameDuration, bullet_client)
+    
+    self._baseOrn, self._baseAngVel = self.__ComputeSphericalRotVel(
+      frameData[4:8], frameDataNext[4:8],
+      frameFraction, keyFrameDuration, bullet_client
+    )
     
     ##pre-rotate to make z-up
     #y2zPos=[0,0,0.0]
     #y2zOrn = p.getQuaternionFromEuler([1.57,0,0])
     #basePos,baseOrn = p.multiplyTransforms(y2zPos, y2zOrn,basePos1,baseOrn1)
 
-    chestRotStart = [frameData[9],frameData[10],frameData[11],frameData[8]]
-    chestRotEnd = [frameDataNext[9],frameDataNext[10],frameDataNext[11],frameDataNext[8]]
-    self._chestRot = bullet_client.getQuaternionSlerp(chestRotStart,chestRotEnd,frameFraction)
-    self._chestVel = self.ComputeAngVel(chestRotStart,chestRotEnd,keyFrameDuration,bullet_client)
-    
-    neckRotStart = [frameData[13],frameData[14],frameData[15],frameData[12]]
-    neckRotEnd= [frameDataNext[13],frameDataNext[14],frameDataNext[15],frameDataNext[12]]
-    self._neckRot =  bullet_client.getQuaternionSlerp(neckRotStart,neckRotEnd,frameFraction)
-    self._neckVel = self.ComputeAngVel(neckRotStart,neckRotEnd,keyFrameDuration,bullet_client)
-    
-    rightHipRotStart = [frameData[17],frameData[18],frameData[19],frameData[16]]
-    rightHipRotEnd = [frameDataNext[17],frameDataNext[18],frameDataNext[19],frameDataNext[16]]
-    self._rightHipRot = bullet_client.getQuaternionSlerp(rightHipRotStart,rightHipRotEnd,frameFraction)
-    self._rightHipVel = self.ComputeAngVel(rightHipRotStart,rightHipRotEnd,keyFrameDuration,bullet_client)
-    
-    rightKneeRotStart = [frameData[20]]
-    rightKneeRotEnd = [frameDataNext[20]]
-    self._rightKneeRot = [rightKneeRotStart[0]+frameFraction*(rightKneeRotEnd[0]-rightKneeRotStart[0])]
-    self._rightKneeVel = [(rightKneeRotEnd[0]-rightKneeRotStart[0])/keyFrameDuration]
-    
-    rightAnkleRotStart = [frameData[22],frameData[23],frameData[24],frameData[21]]
-    rightAnkleRotEnd = [frameDataNext[22],frameDataNext[23],frameDataNext[24],frameDataNext[21]]
-    self._rightAnkleRot =  bullet_client.getQuaternionSlerp(rightAnkleRotStart,rightAnkleRotEnd,frameFraction)
-    self._rightAnkleVel = self.ComputeAngVel(rightAnkleRotStart,rightAnkleRotEnd,keyFrameDuration,bullet_client)
-      
-    rightShoulderRotStart = [frameData[26],frameData[27],frameData[28],frameData[25]]
-    rightShoulderRotEnd = [frameDataNext[26],frameDataNext[27],frameDataNext[28],frameDataNext[25]]
-    self._rightShoulderRot = bullet_client.getQuaternionSlerp(rightShoulderRotStart,rightShoulderRotEnd,frameFraction)
-    self._rightShoulderVel = self.ComputeAngVel(rightShoulderRotStart,rightShoulderRotEnd, keyFrameDuration,bullet_client)
-    
-    rightElbowRotStart = [frameData[29]]
-    rightElbowRotEnd = [frameDataNext[29]]
-    self._rightElbowRot = [rightElbowRotStart[0]+frameFraction*(rightElbowRotEnd[0]-rightElbowRotStart[0])]
-    self._rightElbowVel = [(rightElbowRotEnd[0]-rightElbowRotStart[0])/keyFrameDuration]
-    
-    leftHipRotStart = [frameData[31],frameData[32],frameData[33],frameData[30]]
-    leftHipRotEnd = [frameDataNext[31],frameDataNext[32],frameDataNext[33],frameDataNext[30]]
-    self._leftHipRot = bullet_client.getQuaternionSlerp(leftHipRotStart,leftHipRotEnd,frameFraction)
-    self._leftHipVel = self.ComputeAngVel(leftHipRotStart, leftHipRotEnd,keyFrameDuration,bullet_client)
-    
-    leftKneeRotStart = [frameData[34]]
-    leftKneeRotEnd = [frameDataNext[34]]
-    self._leftKneeRot = [leftKneeRotStart[0] +frameFraction*(leftKneeRotEnd[0]-leftKneeRotStart[0]) ]
-    self._leftKneeVel = [(leftKneeRotEnd[0]-leftKneeRotStart[0])/keyFrameDuration]
-    
-    leftAnkleRotStart = [frameData[36],frameData[37],frameData[38],frameData[35]]
-    leftAnkleRotEnd = [frameDataNext[36],frameDataNext[37],frameDataNext[38],frameDataNext[35]]
-    self._leftAnkleRot = bullet_client.getQuaternionSlerp(leftAnkleRotStart,leftAnkleRotEnd,frameFraction)
-    self._leftAnkleVel = self.ComputeAngVel(leftAnkleRotStart,leftAnkleRotEnd,keyFrameDuration,bullet_client)
+    idx = 8
 
-    leftShoulderRotStart = [frameData[40],frameData[41],frameData[42],frameData[39]]
-    leftShoulderRotEnd = [frameDataNext[40],frameDataNext[41],frameDataNext[42],frameDataNext[39]]
-    self._leftShoulderRot = bullet_client.getQuaternionSlerp(leftShoulderRotStart,leftShoulderRotEnd,frameFraction)
-    self._leftShoulderVel = self.ComputeAngVel(leftShoulderRotStart,leftShoulderRotEnd,keyFrameDuration,bullet_client)
+    for joint_name, joint_info in humanoidJoints.items():
+      if joint_info['spherical']:
+        rot, vel = self.__ComputeSphericalRotVel(
+          frameData[idx:idx+4], frameDataNext[idx:idx+4],
+          frameFraction, keyFrameDuration, bullet_client
+        )
+        idx += 4
+      else:
+        rot, vel = self.__ComputeLinearRotVel(
+          frameData[idx], frameDataNext[idx],
+          frameFraction, keyFrameDuration
+        )
+        idx += 1
 
-    leftElbowRotStart = [frameData[43]]
-    leftElbowRotEnd = [frameDataNext[43]]
-    self._leftElbowRot = [leftElbowRotStart[0]+frameFraction*(leftElbowRotEnd[0]-leftElbowRotStart[0])]
-    self._leftElbowVel = [(leftElbowRotEnd[0]-leftElbowRotStart[0])/keyFrameDuration]
-        
+      self.__SetJointRot(joint_name, rot)
+      self.__SetJointVel(joint_name, vel)
+  
+
+  @staticmethod
+  def PoseFromAction(action, bullet_client):
+    '''Creates a HumanoidPose object given the set of actions applied the Humanoid
+
+    For "revolute" joints the action is directly applied as the target position
+    For "spherical" joints the action is assumed to be in the axis-angle format
+    and needs to be converted to Quaternion first
+    '''
+    pose = HumanoidPose()
+    pose.Reset()
+
+    idx = 0
+
+    for joint_name, joint_info in humanoidJoints.items():
+      if joint_info['spherical']:
+        angle = action[idx]
+        axis = [action[idx+1], action[idx+2], action[idx+3]]
+        rotation = bullet_client.getQuaternionFromAxisAngle(axis, angle)
+        idx += 4
+      else:
+        angle = action[idx]
+        rotation = [angle]
+        idx += 1
+
+      pose.__SetJointRot(joint_name, rotation)
+    
+    return pose
+
 
 class Humanoid(object):
   def __init__(self, pybullet_client, motion_data, baseShift):
@@ -303,83 +351,20 @@ class Humanoid(object):
     frameDataNext = self._motion_data._motion_data['Frames'][self._frameNext]
     pose = HumanoidPose()
     pose.Slerp(self._frameFraction, frameData, frameDataNext, self._pybullet_client)
-    return pose
-    
-
-  
+    return pose  
     
   def ApplyAction(self, action):
-    #turn action into pose
-    pose = HumanoidPose()
-    pose.Reset()
-    index=0
-    angle = action[index]
-    axis = [action[index+1],action[index+2],action[index+3]]
-    index+=4
-    pose._chestRot = self._pybullet_client.getQuaternionFromAxisAngle(axis,angle)
-    #print("pose._chestRot=",pose._chestRot)
-
-    angle = action[index]
-    axis = [action[index+1],action[index+2],action[index+3]]
-    index+=4
-    pose._neckRot = self._pybullet_client.getQuaternionFromAxisAngle(axis,angle)
+    '''Turns action into a HumanPose and then the pose is applied to the humanoid'''
     
-    angle = action[index]
-    axis = [action[index+1],action[index+2],action[index+3]]
-    index+=4
-    pose._rightHipRot = self._pybullet_client.getQuaternionFromAxisAngle(axis,angle)
-    
-    angle = action[index]
-    index+=1
-    pose._rightKneeRot = [angle]
-        
-    angle = action[index]
-    axis = [action[index+1],action[index+2],action[index+3]]
-    index+=4
-    pose._rightAnkleRot = self._pybullet_client.getQuaternionFromAxisAngle(axis,angle)
-    
-    angle = action[index]
-    axis = [action[index+1],action[index+2],action[index+3]]
-    index+=4
-    pose._rightShoulderRot = self._pybullet_client.getQuaternionFromAxisAngle(axis,angle)
-    
-    angle = action[index]
-    index+=1
-    pose._rightElbowRot = [angle]
-    
-    angle = action[index]
-    axis = [action[index+1],action[index+2],action[index+3]]
-    index+=4
-    pose._leftHipRot = self._pybullet_client.getQuaternionFromAxisAngle(axis,angle)
-    
-    angle = action[index]
-    index+=1
-    pose._leftKneeRot = [angle]
+    self.ApplyPose(
+      pose=HumanoidPose.PoseFromAction(action, self._pybullet_client),
+      initializeBase=False, initializeVelocities=False,
+      humanoid=self._humanoid,
+      bc=self._pybullet_client,
+    )
     
     
-    angle = action[index]
-    axis = [action[index+1],action[index+2],action[index+3]]
-    index+=4
-    pose._leftAnkleRot = self._pybullet_client.getQuaternionFromAxisAngle(axis,angle)
-    
-    angle = action[index]
-    axis = [action[index+1],action[index+2],action[index+3]]
-    index+=4
-    pose._leftShoulderRot = self._pybullet_client.getQuaternionFromAxisAngle(axis,angle)
-        
-    angle = action[index]
-    index+=1
-    pose._leftElbowRot = [angle]
-    
-    
-    #print("index=",index)
-    
-    initializeBase = False
-    initializeVelocities = False
-    self.ApplyPose(pose, initializeBase, initializeVelocities, self._humanoid, self._pybullet_client)
-    
-    
-  def ApplyPose(self, pose, initializeBase, initializeVelocities, humanoid,bc):
+  def ApplyPose(self, pose, initializeBase, initializeVelocities, humanoid, bc):
     #todo: get tunable parametes from a json file or from URDF (kd, maxForce)
     if (initializeBase):
       bc.changeVisualShape(humanoid, 2 , rgbaColor=[1,0,0,1])
@@ -393,63 +378,28 @@ class Humanoid(object):
     else:
       bc.changeVisualShape(humanoid, 2 , rgbaColor=[1,1,1,1])
     
-    
-    
-    kp=0.03
-    chest=1
-    neck=2
-    rightShoulder=3
-    rightElbow=4
-    leftShoulder=6
-    leftElbow = 7
-    rightHip = 9
-    rightKnee=10
-    rightAnkle=11
-    leftHip = 12
-    leftKnee=13
-    leftAnkle=14
+    kp = 0.03
     controlMode = bc.POSITION_CONTROL
     
     if (initializeBase):
-      if initializeVelocities:
-        bc.resetJointStateMultiDof(humanoid,chest,pose._chestRot, pose._chestVel)
-        bc.resetJointStateMultiDof(humanoid,neck,pose._neckRot, pose._neckVel)
-        bc.resetJointStateMultiDof(humanoid,rightHip,pose._rightHipRot, pose._rightHipVel)
-        bc.resetJointStateMultiDof(humanoid,rightKnee,pose._rightKneeRot, pose._rightKneeVel)
-        bc.resetJointStateMultiDof(humanoid,rightAnkle,pose._rightAnkleRot, pose._rightAnkleVel)
-        bc.resetJointStateMultiDof(humanoid,rightShoulder,pose._rightShoulderRot, pose._rightShoulderVel)
-        bc.resetJointStateMultiDof(humanoid,rightElbow, pose._rightElbowRot, pose._rightElbowVel)
-        bc.resetJointStateMultiDof(humanoid,leftHip, pose._leftHipRot, pose._leftHipVel)
-        bc.resetJointStateMultiDof(humanoid,leftKnee, pose._leftKneeRot, pose._leftKneeVel)
-        bc.resetJointStateMultiDof(humanoid,leftAnkle, pose._leftAnkleRot, pose._leftAnkleVel)
-        bc.resetJointStateMultiDof(humanoid,leftShoulder, pose._leftShoulderRot, pose._leftShoulderVel)
-        bc.resetJointStateMultiDof(humanoid,leftElbow, pose._leftElbowRot, pose._leftElbowVel)
-      else:
-        bc.resetJointStateMultiDof(humanoid,chest,pose._chestRot)
-        bc.resetJointStateMultiDof(humanoid,neck,pose._neckRot)
-        bc.resetJointStateMultiDof(humanoid,rightHip,pose._rightHipRot)
-        bc.resetJointStateMultiDof(humanoid,rightKnee,pose._rightKneeRot)
-        bc.resetJointStateMultiDof(humanoid,rightAnkle,pose._rightAnkleRot)
-        bc.resetJointStateMultiDof(humanoid,rightShoulder,pose._rightShoulderRot)
-        bc.resetJointStateMultiDof(humanoid,rightElbow, pose._rightElbowRot)
-        bc.resetJointStateMultiDof(humanoid,leftHip, pose._leftHipRot)
-        bc.resetJointStateMultiDof(humanoid,leftKnee, pose._leftKneeRot)
-        bc.resetJointStateMultiDof(humanoid,leftAnkle, pose._leftAnkleRot)
-        bc.resetJointStateMultiDof(humanoid,leftShoulder, pose._leftShoulderRot)
-        bc.resetJointStateMultiDof(humanoid,leftElbow, pose._leftElbowRot)
+      for joint_name, joint_info in humanoidJoints.items():
+        bc.resetJointStateMultiDof(
+          humanoid,
+          joint_info['joint_index'],
+          pose.GetJointRot(joint_name),
+          pose.GetJointVel(joint_name) if initializeVelocities else None,
+          ### TODO: is None the same as not passing an argument?
+        )
     
-    bc.setJointMotorControlMultiDof(humanoid,chest,controlMode, targetPosition=pose._chestRot,positionGain=kp, force=[200])
-    bc.setJointMotorControlMultiDof(humanoid,neck,controlMode,targetPosition=pose._neckRot,positionGain=kp, force=[50])
-    bc.setJointMotorControlMultiDof(humanoid,rightHip,controlMode,targetPosition=pose._rightHipRot,positionGain=kp, force=[200])
-    bc.setJointMotorControlMultiDof(humanoid,rightKnee,controlMode,targetPosition=pose._rightKneeRot,positionGain=kp, force=[150])
-    bc.setJointMotorControlMultiDof(humanoid,rightAnkle,controlMode,targetPosition=pose._rightAnkleRot,positionGain=kp, force=[90])
-    bc.setJointMotorControlMultiDof(humanoid,rightShoulder,controlMode,targetPosition=pose._rightShoulderRot,positionGain=kp, force=[100])
-    bc.setJointMotorControlMultiDof(humanoid,rightElbow, controlMode,targetPosition=pose._rightElbowRot,positionGain=kp, force=[60])
-    bc.setJointMotorControlMultiDof(humanoid,leftHip, controlMode,targetPosition=pose._leftHipRot,positionGain=kp, force=[200])
-    bc.setJointMotorControlMultiDof(humanoid,leftKnee, controlMode,targetPosition=pose._leftKneeRot,positionGain=kp, force=[150])
-    bc.setJointMotorControlMultiDof(humanoid,leftAnkle, controlMode,targetPosition=pose._leftAnkleRot,positionGain=kp, force=[90])
-    bc.setJointMotorControlMultiDof(humanoid,leftShoulder, controlMode,targetPosition=pose._leftShoulderRot,positionGain=kp, force=[100])
-    bc.setJointMotorControlMultiDof(humanoid,leftElbow, controlMode,targetPosition=pose._leftElbowRot,positionGain=kp, force=[60])
+    for joint_name, joint_info in humanoidJoints.items():
+      bc.setJointMotorControlMultiDof(
+        humanoid,
+        joint_info['joint_index'],
+        controlMode,
+        targetPosition=pose.GetJointRot(joint_name),
+        positionGain=kp,
+        force=[joint_info['max_force']]
+      )
   
     #debug space
     #if (False):
@@ -681,3 +631,66 @@ class Humanoid(object):
     pos,orn = self._pybullet_client.getBasePositionAndOrientation(self._humanoid)
     return pos
 
+
+humanoidJoints = OrderedDict([
+  ['chest', {
+    'spherical': True,
+    'joint_index': 1,
+    'max_force': 200,
+  }],
+  ['neck', {
+    'spherical': True,
+    'joint_index': 2,
+    'max_force': 50,
+  }],
+  ['rightHip', {
+    'spherical': True,
+    'joint_index': 9,
+    'max_force': 200,
+  }],
+  ['rightKnee', {
+    'spherical': False,
+    'joint_index': 10,
+    'max_force': 150,
+  }],
+  ['rightAnkle', {
+    'spherical': True,
+    'joint_index': 11,
+    'max_force': 90,
+  }],
+  ['rightShoulder', {
+    'spherical': True,
+    'joint_index': 3,
+    'max_force': 100,
+  }],
+  ['rightElbow', {
+    'spherical': False,
+    'joint_index': 4,
+    'max_force': 60,
+  }],
+  ['leftHip', {
+    'spherical': True,
+    'joint_index': 12,
+    'max_force': 200,
+  }],
+  ['leftKnee', {
+    'spherical': False,
+    'joint_index': 13,
+    'max_force': 150,
+  }],
+  ['leftAnkle', {
+    'spherical': True,
+    'joint_index': 14,
+    'max_force': 90,
+  }],
+  ['leftShoulder', {
+    'spherical': True,
+    'joint_index': 6,
+    'max_force': 100,
+  }],
+  ['leftElbow', {
+    'spherical': False,
+    'joint_index': 7,
+    'max_force': 60,
+  }],
+])
