@@ -8,8 +8,8 @@ from collections import OrderedDict
 from pybullet_utils.bullet_client import BulletClient
 import pybullet_data
 
-jointTypes = ["JOINT_REVOLUTE","JOINT_PRISMATIC",
-              "JOINT_SPHERICAL","JOINT_PLANAR","JOINT_FIXED"]
+# jointTypes = ["JOINT_REVOLUTE","JOINT_PRISMATIC",
+#               "JOINT_SPHERICAL","JOINT_PLANAR","JOINT_FIXED"]
               
 class HumanoidPose(object):
   def __init__(self):
@@ -267,10 +267,20 @@ class Humanoid(object):
     return count
 
   def SetSimTime(self, t):
+    '''
+    Sets the following attributes on the `self` object:
+      _frame
+      _frameNext
+      _frameFraction
+
+    TODO: The `_frameNext` may be set incorrectly at the end of the cycle
+
+    TODO: refactor helper methods to `MotionCaptureData` object
+    '''
     self._simTime = t
     #print("SetTimeTime time =",t)
     keyFrameDuration = self._motion_data.KeyFrameDuration()
-    cycleTime = keyFrameDuration*(self._motion_data.NumFrames()-1)
+    cycleTime = self._motion_data.CycleDuration()
     #print("self._motion_data.NumFrames()=",self._motion_data.NumFrames())
     #print("cycleTime=",cycleTime)
     cycles = self.CalcCycleCount(t, cycleTime)
