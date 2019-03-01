@@ -17,7 +17,9 @@ project ("pybullet")
 		
 		includedirs {"../../src", "../../examples",
 		"../../examples/ThirdPartyLibs"}
-		defines {"PHYSICS_IN_PROCESS_EXAMPLE_BROWSER"}
+		defines {"PHYSICS_IN_PROCESS_EXAMPLE_BROWSER", "STATIC_LINK_SPD_PLUGIN"}
+		
+		
 	hasCL = findOpenCL("clew")
 
 	links{ "BulletExampleBrowserLib","gwen", "BulletFileLoader","BulletWorldImporter","OpenGL_Window","BulletSoftBody", "BulletInverseDynamicsUtils", "BulletInverseDynamics", "BulletDynamics","BulletCollision","LinearMath","BussIK", "Bullet3Common"}
@@ -170,6 +172,20 @@ if not _OPTIONS["no-enet"] then
 			"../../examples/SharedMemory/plugins/collisionFilterPlugin/collisionFilterPlugin.cpp",
 			"../../examples/SharedMemory/plugins/pdControlPlugin/pdControlPlugin.cpp",
 			"../../examples/SharedMemory/plugins/pdControlPlugin/pdControlPlugin.h",
+			"../../examples/SharedMemory/plugins/stablePDPlugin/SpAlg.cpp",
+			"../../examples/SharedMemory/plugins/stablePDPlugin/SpAlg.h",
+			"../../examples/SharedMemory/plugins/stablePDPlugin/Shape.cpp",
+			"../../examples/SharedMemory/plugins/stablePDPlugin/Shape.h",
+			"../../examples/SharedMemory/plugins/stablePDPlugin/RBDUtil.cpp",
+			"../../examples/SharedMemory/plugins/stablePDPlugin/RBDUtil.h",
+			"../../examples/SharedMemory/plugins/stablePDPlugin/RBDModel.cpp",
+			"../../examples/SharedMemory/plugins/stablePDPlugin/RBDModel.h",
+			"../../examples/SharedMemory/plugins/stablePDPlugin/MathUtil.cpp",
+			"../../examples/SharedMemory/plugins/stablePDPlugin/MathUtil.h",
+			"../../examples/SharedMemory/plugins/stablePDPlugin/KinTree.cpp",
+			"../../examples/SharedMemory/plugins/stablePDPlugin/KinTree.h",
+			"../../examples/SharedMemory/plugins/stablePDPlugin/BulletConversion.cpp",
+			"../../examples/SharedMemory/plugins/stablePDPlugin/BulletConversion.h",
 			}
 
 	if _OPTIONS["enable_physx"] then
@@ -207,12 +223,10 @@ if not _OPTIONS["no-enet"] then
 				"../../examples/SharedMemory/plugins/eglPlugin/eglRendererVisualShapeConverter.cpp",
 				"../../examples/SharedMemory/plugins/eglPlugin/eglRendererVisualShapeConverter.h",
 				"../../examples/SharedMemory/physx/PhysXC_API.cpp",
-				"../../examples/SharedMemory/physx/PhysXClient.cpp",
 				"../../examples/SharedMemory/physx/PhysXServerCommandProcessor.cpp",
 				"../../examples/SharedMemory/physx/PhysXUrdfImporter.cpp",
 				"../../examples/SharedMemory/physx/URDF2PhysX.cpp",
 				"../../examples/SharedMemory/physx/PhysXC_API.h",
-				"../../examples/SharedMemory/physx/PhysXClient.h",
 				"../../examples/SharedMemory/physx/PhysXServerCommandProcessor.h",
 				"../../examples/SharedMemory/physx/PhysXUrdfImporter.h",
 				"../../examples/SharedMemory/physx/URDF2PhysX.h",

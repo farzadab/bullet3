@@ -8,8 +8,9 @@
 //instead, only ADD a new one at the top, comment-out previous one
 
 
-#define SHARED_MEMORY_MAGIC_NUMBER   201811260
-//#define SHARED_MEMORY_MAGIC_NUMBER   201810250
+#define SHARED_MEMORY_MAGIC_NUMBER 201902120
+//#define SHARED_MEMORY_MAGIC_NUMBER 201811260
+//#define SHARED_MEMORY_MAGIC_NUMBER 201810250
 //#define SHARED_MEMORY_MAGIC_NUMBER 201809030
 //#define SHARED_MEMORY_MAGIC_NUMBER 201809010
 //#define SHARED_MEMORY_MAGIC_NUMBER 201807040
@@ -292,7 +293,7 @@ struct b3UserDataValue
 {
 	int m_type;
 	int m_length;
-	char* m_data1;
+	const char* m_data1;
 };
 
 struct b3UserConstraint
@@ -325,6 +326,8 @@ enum DynamicsActivationState
 	eActivationStateDisableSleeping = 2,
 	eActivationStateWakeUp = 4,
 	eActivationStateSleep = 8,
+	eActivationStateEnableWakeup = 16,
+	eActivationStateDisableWakeup = 32,
 };
 
 struct b3DynamicsInfo
@@ -366,7 +369,7 @@ struct b3JointSensorState2
 	double m_jointPosition[4];
 	double m_jointVelocity[3];
 	double m_jointReactionForceTorque[6]; /* note to roboticists: this is NOT the motor torque/force, but the spatial reaction force vector at joint */
-	double m_jointMotorTorque;
+	double m_jointMotorTorqueMultiDof[3];
 	int m_qDofSize;
 	int m_uDofSize;
 };
@@ -441,6 +444,7 @@ enum b3VREventType
 #define MAX_MOUSE_EVENTS 256
 
 #define MAX_SDF_BODIES 512
+#define MAX_USER_DATA_KEY_LENGTH 256
 
 enum b3VRButtonInfo
 {
@@ -535,7 +539,11 @@ struct b3BodyNotificationArgs
 
 struct b3UserDataNotificationArgs
 {
+	int m_bodyUniqueId;
+	int m_linkIndex;
+	int m_visualShapeIndex;
 	int m_userDataId;
+	char m_key[MAX_USER_DATA_KEY_LENGTH];
 };
 
 struct b3LinkNotificationArgs
@@ -838,6 +846,7 @@ enum eURDF_Flags
 	URDF_USE_MATERIAL_COLORS_FROM_MTL = 32768,
 	URDF_USE_MATERIAL_TRANSPARANCY_FROM_MTL = 65536,
 	URDF_MAINTAIN_LINK_ORDER = 131072,
+	URDF_ENABLE_WAKEUP = 262144,
 };
 
 enum eUrdfGeomTypes  //sync with UrdfParser UrdfGeomTypes

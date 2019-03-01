@@ -36,7 +36,6 @@ typedef unsigned long long int smUint64_t;
 #define MAX_SDF_FILENAME_LENGTH 1024
 #define MAX_FILENAME_LENGTH MAX_URDF_FILENAME_LENGTH
 #define MAX_NUM_LINKS MAX_DEGREE_OF_FREEDOM
-#define MAX_USER_DATA_KEY_LENGTH MAX_URDF_FILENAME_LENGTH
 
 
 struct TmpFloat3
@@ -164,6 +163,7 @@ enum EnumChangeDynamicsInfoFlags
 	CHANGE_DYNAMICS_INFO_SET_CCD_SWEPT_SPHERE_RADIUS = 2048,
 	CHANGE_DYNAMICS_INFO_SET_CONTACT_PROCESSING_THRESHOLD = 4096,
 	CHANGE_DYNAMICS_INFO_SET_ACTIVATION_STATE = 8192,
+	CHANGE_DYNAMICS_INFO_SET_JOINT_DAMPING = 16384,
 };
 
 struct ChangeDynamicsInfoArgs
@@ -185,6 +185,7 @@ struct ChangeDynamicsInfoArgs
 	double m_ccdSweptSphereRadius;
 	double m_contactProcessingThreshold;
 	int m_activationState;
+	double m_jointDamping;
 };
 
 struct GetDynamicsInfoArgs
@@ -530,6 +531,7 @@ struct SendActualStateArgs
 	double m_jointReactionForces[6 * MAX_DEGREE_OF_FREEDOM];
 
 	double m_jointMotorForce[MAX_DEGREE_OF_FREEDOM];
+	double m_jointMotorForceMultiDof[MAX_DEGREE_OF_FREEDOM];
 
 	double m_linkState[7 * MAX_NUM_LINKS];
 	double m_linkWorldVelocities[6 * MAX_NUM_LINKS];  //linear velocity and angular velocity in world space (x/y/z each).
@@ -979,14 +981,8 @@ struct b3CreateMultiBodyArgs
 	int m_linkJointTypes[MAX_CREATE_MULTI_BODY_LINKS];
 	double m_linkJointAxis[3 * MAX_CREATE_MULTI_BODY_LINKS];
 	int m_flags;
-#if 0
-	std::string m_name;
-	std::string m_sourceFile;
-    btTransform m_rootTransformInWorld;
-	btHashMap<btHashString, UrdfMaterial*> m_materials;
-	btHashMap<btHashString, UrdfLink*> m_links;
-	btHashMap<btHashString, UrdfJoint*> m_joints;
-#endif
+	int m_numBatchObjects;
+
 };
 
 struct b3CreateMultiBodyResultArgs

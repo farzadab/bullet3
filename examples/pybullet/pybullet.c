@@ -456,7 +456,7 @@ static PyObject* pybullet_connectPhysicsServer(PyObject* self, PyObject* args, P
 #ifdef BT_ENABLE_PHYSX
 			case eCONNECT_PHYSX:
 			{
-				sm = b3ConnectPhysX();
+				sm = b3ConnectPhysX(argc, argv);
 				break;
 			}
 #endif
@@ -1233,20 +1233,21 @@ static PyObject* pybullet_changeDynamicsInfo(PyObject* self, PyObject* args, PyO
 	double restitution = -1;
 	double linearDamping = -1;
 	double angularDamping = -1;
+	
 	double contactStiffness = -1;
 	double contactDamping = -1;
 	double ccdSweptSphereRadius = -1;
 	int frictionAnchor = -1;
 	double contactProcessingThreshold = -1;
 	int activationState = -1;
-
+	double jointDamping = -1;
 	PyObject* localInertiaDiagonalObj = 0;
 
 	b3PhysicsClientHandle sm = 0;
 
 	int physicsClientId = 0;
-	static char* kwlist[] = {"bodyUniqueId", "linkIndex", "mass", "lateralFriction", "spinningFriction", "rollingFriction", "restitution", "linearDamping", "angularDamping", "contactStiffness", "contactDamping", "frictionAnchor", "localInertiaDiagonal", "ccdSweptSphereRadius", "contactProcessingThreshold", "activationState", "physicsClientId", NULL};
-	if (!PyArg_ParseTupleAndKeywords(args, keywds, "ii|dddddddddiOddii", kwlist, &bodyUniqueId, &linkIndex, &mass, &lateralFriction, &spinningFriction, &rollingFriction, &restitution, &linearDamping, &angularDamping, &contactStiffness, &contactDamping, &frictionAnchor, &localInertiaDiagonalObj, &ccdSweptSphereRadius, &contactProcessingThreshold, &activationState, &physicsClientId))
+	static char* kwlist[] = {"bodyUniqueId", "linkIndex", "mass", "lateralFriction", "spinningFriction", "rollingFriction", "restitution", "linearDamping", "angularDamping", "contactStiffness", "contactDamping", "frictionAnchor", "localInertiaDiagonal", "ccdSweptSphereRadius", "contactProcessingThreshold", "activationState", "jointDamping", "physicsClientId", NULL};
+	if (!PyArg_ParseTupleAndKeywords(args, keywds, "ii|dddddddddiOddidi", kwlist, &bodyUniqueId, &linkIndex, &mass, &lateralFriction, &spinningFriction, &rollingFriction, &restitution, &linearDamping, &angularDamping, &contactStiffness, &contactDamping, &frictionAnchor, &localInertiaDiagonalObj, &ccdSweptSphereRadius, &contactProcessingThreshold, &activationState, &jointDamping, &physicsClientId))
 	{
 		return NULL;
 	}
@@ -1300,6 +1301,10 @@ static PyObject* pybullet_changeDynamicsInfo(PyObject* self, PyObject* args, PyO
 			b3ChangeDynamicsInfoSetAngularDamping(command, bodyUniqueId, angularDamping);
 		}
 
+		if (jointDamping >= 0)
+		{
+			b3ChangeDynamicsInfoSetJointDamping(command, bodyUniqueId, linkIndex, jointDamping);
+		}
 		if (restitution >= 0)
 		{
 			b3ChangeDynamicsInfoSetRestitution(command, bodyUniqueId, linkIndex, restitution);
@@ -1496,9 +1501,32 @@ static PyObject* pybullet_setPhysicsEngineParameter(PyObject* self, PyObject* ar
 	int minimumSolverIslandSize = -1;
 
 	int physicsClientId = 0;
-	static char* kwlist[] = {"fixedTimeStep", "numSolverIterations", "useSplitImpulse", "splitImpulsePenetrationThreshold", "numSubSteps", "collisionFilterMode", "contactBreakingThreshold", "maxNumCmdPer1ms", "enableFileCaching", "restitutionVelocityThreshold", "erp", "contactERP", "frictionERP", "enableConeFriction", "deterministicOverlappingPairs", "allowedCcdPenetration", "jointFeedbackMode", "solverResidualThreshold", "contactSlop", "enableSAT", "constraintSolverType", "globalCFM", "minimumSolverIslandSize", "physicsClientId", NULL};
+	static char* kwlist[] = {"fixedTimeStep", 
+		"numSolverIterations", 
+		"useSplitImpulse", 
+		"splitImpulsePenetrationThreshold", 
+		"numSubSteps", 
+		"collisionFilterMode", 
+		"contactBreakingThreshold", 
+		"maxNumCmdPer1ms", 
+		"enableFileCaching", 
+		"restitutionVelocityThreshold", 
+		"erp", 
+		"contactERP", 
+		"frictionERP", 
+		"enableConeFriction", 
+		"deterministicOverlappingPairs", 
+		"allowedCcdPenetration", 
+		"jointFeedbackMode", 
+		"solverResidualThreshold", 
+		"contactSlop", 
+		"enableSAT", 
+		"constraintSolverType", 
+		"globalCFM", 
+		"minimumSolverIslandSize", 
+		"physicsClientId", NULL};
 
-	if (!PyArg_ParseTupleAndKeywords(args, keywds, "|diidiidiiddddiididdiiddi", kwlist, &fixedTimeStep, &numSolverIterations, &useSplitImpulse, &splitImpulsePenetrationThreshold, &numSubSteps,
+	if (!PyArg_ParseTupleAndKeywords(args, keywds, "|diidiidiiddddiididdiidii", kwlist, &fixedTimeStep, &numSolverIterations, &useSplitImpulse, &splitImpulsePenetrationThreshold, &numSubSteps,
 									 &collisionFilterMode, &contactBreakingThreshold, &maxNumCmdPer1ms, &enableFileCaching, &restitutionVelocityThreshold, &erp, &contactERP, &frictionERP, &enableConeFriction, &deterministicOverlappingPairs, &allowedCcdPenetration, &jointFeedbackMode, &solverResidualThreshold, &contactSlop, &enableSAT, &constraintSolverType, &globalCFM, &minimumSolverIslandSize, &physicsClientId))
 	{
 		return NULL;
@@ -4207,6 +4235,7 @@ static PyObject* pybullet_getJointStateMultiDof(PyObject* self, PyObject* args, 
 	PyObject* pyListJointState;
 	PyObject* pyListPosition;
 	PyObject* pyListVelocity;
+	PyObject* pyListJointMotorTorque;
 
 
 	struct b3JointSensorState2 sensorState;
@@ -4268,7 +4297,7 @@ static PyObject* pybullet_getJointStateMultiDof(PyObject* self, PyObject* args, 
 				int i = 0;
 				pyListPosition = PyTuple_New(sensorState.m_qDofSize);
 				pyListVelocity = PyTuple_New(sensorState.m_uDofSize);
-
+				pyListJointMotorTorque = PyTuple_New(sensorState.m_uDofSize);
 				PyTuple_SetItem(pyListJointState, 0, pyListPosition);
 				PyTuple_SetItem(pyListJointState, 1, pyListVelocity);
 
@@ -4282,6 +4311,9 @@ static PyObject* pybullet_getJointStateMultiDof(PyObject* self, PyObject* args, 
 				{
 					PyTuple_SetItem(pyListVelocity, i,
 						PyFloat_FromDouble(sensorState.m_jointVelocity[i]));
+
+					PyTuple_SetItem(pyListJointMotorTorque, i, 
+						PyFloat_FromDouble(sensorState.m_jointMotorTorqueMultiDof[i]));
 				}
 				
 				for (j = 0; j < forceTorqueSize; j++)
@@ -4292,8 +4324,8 @@ static PyObject* pybullet_getJointStateMultiDof(PyObject* self, PyObject* args, 
 
 				PyTuple_SetItem(pyListJointState, 2, pyListJointForceTorque);
 
-				PyTuple_SetItem(pyListJointState, 3,
-					PyFloat_FromDouble(sensorState.m_jointMotorTorque));
+				PyTuple_SetItem(pyListJointState, 3, pyListJointMotorTorque);
+					
 
 				return pyListJointState;
 			}
@@ -7651,18 +7683,19 @@ static PyObject* pybullet_createMultiBody(PyObject* self, PyObject* args, PyObje
 	PyObject* linkJointAxisObj = 0;
 	PyObject* linkInertialFramePositionObj = 0;
 	PyObject* linkInertialFrameOrientationObj = 0;
+	PyObject* objBatchPositions = 0;
 
 	static char* kwlist[] = {
 		"baseMass", "baseCollisionShapeIndex", "baseVisualShapeIndex", "basePosition", "baseOrientation",
 		"baseInertialFramePosition", "baseInertialFrameOrientation", "linkMasses", "linkCollisionShapeIndices",
 		"linkVisualShapeIndices", "linkPositions", "linkOrientations", "linkInertialFramePositions", "linkInertialFrameOrientations", "linkParentIndices",
-		"linkJointTypes", "linkJointAxis", "useMaximalCoordinates", "flags", "physicsClientId", NULL};
+		"linkJointTypes", "linkJointAxis", "useMaximalCoordinates", "flags", "batchPositions", "physicsClientId", NULL};
 
-	if (!PyArg_ParseTupleAndKeywords(args, keywds, "|diiOOOOOOOOOOOOOOiii", kwlist,
+	if (!PyArg_ParseTupleAndKeywords(args, keywds, "|diiOOOOOOOOOOOOOOiiOi", kwlist,
 									 &baseMass, &baseCollisionShapeIndex, &baseVisualShapeIndex, &basePosObj, &baseOrnObj,
 									 &baseInertialFramePositionObj, &baseInertialFrameOrientationObj, &linkMassesObj, &linkCollisionShapeIndicesObj,
 									 &linkVisualShapeIndicesObj, &linkPositionsObj, &linkOrientationsObj, &linkInertialFramePositionObj, &linkInertialFrameOrientationObj, &linkParentIndicesObj,
-									 &linkJointTypesObj, &linkJointAxisObj, &useMaximalCoordinates, &flags, &physicsClientId))
+									 &linkJointTypesObj, &linkJointAxisObj, &useMaximalCoordinates, &flags, &objBatchPositions, &physicsClientId))
 	{
 		return NULL;
 	}
@@ -7685,6 +7718,7 @@ static PyObject* pybullet_createMultiBody(PyObject* self, PyObject* args, PyObje
 		int numLinkJoinAxis = linkJointAxisObj ? PySequence_Size(linkJointAxisObj) : 0;
 		int numLinkInertialFramePositions = linkInertialFramePositionObj ? PySequence_Size(linkInertialFramePositionObj) : 0;
 		int numLinkInertialFrameOrientations = linkInertialFrameOrientationObj ? PySequence_Size(linkInertialFrameOrientationObj) : 0;
+		int numBatchPositions = objBatchPositions ? PySequence_Size(objBatchPositions) : 0;
 
 		PyObject* seqLinkMasses = linkMassesObj ? PySequence_Fast(linkMassesObj, "expected a sequence") : 0;
 		PyObject* seqLinkCollisionShapes = linkCollisionShapeIndicesObj ? PySequence_Fast(linkCollisionShapeIndicesObj, "expected a sequence") : 0;
@@ -7696,6 +7730,8 @@ static PyObject* pybullet_createMultiBody(PyObject* self, PyObject* args, PyObje
 		PyObject* seqLinkJoinAxis = linkJointAxisObj ? PySequence_Fast(linkJointAxisObj, "expected a sequence") : 0;
 		PyObject* seqLinkInertialFramePositions = linkInertialFramePositionObj ? PySequence_Fast(linkInertialFramePositionObj, "expected a sequence") : 0;
 		PyObject* seqLinkInertialFrameOrientations = linkInertialFrameOrientationObj ? PySequence_Fast(linkInertialFrameOrientationObj, "expected a sequence") : 0;
+
+		PyObject* seqBatchPositions = objBatchPositions ? PySequence_Fast(objBatchPositions, "expected a sequence") : 0;
 
 		if ((numLinkMasses == numLinkCollisionShapes) &&
 			(numLinkMasses == numLinkVisualShapes) &&
@@ -7723,6 +7759,18 @@ static PyObject* pybullet_createMultiBody(PyObject* self, PyObject* args, PyObje
 
 			baseIndex = b3CreateMultiBodyBase(commandHandle, baseMass, baseCollisionShapeIndex, baseVisualShapeIndex, basePosition, baseOrientation, baseInertialFramePosition, baseInertialFrameOrientation);
 
+			if (numBatchPositions > 0)
+			{
+				double* batchPositions = malloc(sizeof(double) * 3 * numBatchPositions);
+				for (i = 0; i < numBatchPositions; i++)
+				{
+					pybullet_internalGetVector3FromSequence(seqBatchPositions, i, &batchPositions[3*i]);
+				}
+				b3CreateMultiBodySetBatchPositions(sm, commandHandle, batchPositions, numBatchPositions);
+				free(batchPositions);
+			}
+			
+
 			for (i = 0; i < numLinkMasses; i++)
 			{
 				double linkMass = pybullet_internalGetFloatFromSequence(seqLinkMasses, i);
@@ -7737,7 +7785,7 @@ static PyObject* pybullet_createMultiBody(PyObject* self, PyObject* args, PyObje
 				int linkJointType;
 
 				pybullet_internalGetVector3FromSequence(seqLinkInertialFramePositions, i, linkInertialFramePosition);
-				pybullet_internalGetVector4FromSequence(linkInertialFrameOrientationObj, i, linkInertialFrameOrientation);
+				pybullet_internalGetVector4FromSequence(seqLinkInertialFrameOrientations, i, linkInertialFrameOrientation);
 				pybullet_internalGetVector3FromSequence(seqLinkPositions, i, linkPosition);
 				pybullet_internalGetVector4FromSequence(seqLinkOrientations, i, linkOrientation);
 				pybullet_internalGetVector3FromSequence(seqLinkJoinAxis, i, linkJointAxis);
@@ -7777,6 +7825,8 @@ static PyObject* pybullet_createMultiBody(PyObject* self, PyObject* args, PyObje
 				Py_DECREF(seqLinkInertialFramePositions);
 			if (seqLinkInertialFrameOrientations)
 				Py_DECREF(seqLinkInertialFrameOrientations);
+			if (seqBatchPositions)
+				Py_DECREF(seqBatchPositions);
 
 			if (useMaximalCoordinates > 0)
 			{
@@ -7817,7 +7867,8 @@ static PyObject* pybullet_createMultiBody(PyObject* self, PyObject* args, PyObje
 				Py_DECREF(seqLinkInertialFramePositions);
 			if (seqLinkInertialFrameOrientations)
 				Py_DECREF(seqLinkInertialFrameOrientations);
-
+			if (seqBatchPositions)
+				Py_DECREF(seqBatchPositions);
 			PyErr_SetString(SpamError, "All link arrays need to be same size.");
 			return NULL;
 		}
@@ -9281,7 +9332,7 @@ static PyObject* pybullet_getDifferenceQuaternion(PyObject* self, PyObject* args
 	int physicsClientId = 0;
 	int hasQuatStart = 0;
 	int hasQuatEnd = 0;
-
+	
 	static char* kwlist[] = { "quaternionStart", "quaternionEnd", "physicsClientId", NULL };
 	if (!PyArg_ParseTupleAndKeywords(args, keywds, "OO|i", kwlist, &quatStartObj, &quatEndObj, &physicsClientId))
 	{
@@ -10706,11 +10757,11 @@ static PyMethodDef SpamMethods[] = {
 	{NULL, NULL, 0, NULL} /* Sentinel */
 };
 
-///copied from CommonWindowInterface.h
-
+///copied from CommonCallbacks.h
 enum
 {
 	B3G_ESCAPE = 27,
+	B3G_SPACE = 32,
 	B3G_F1 = 0xff00,
 	B3G_F2,
 	B3G_F3,
@@ -10740,7 +10791,7 @@ enum
 	B3G_SHIFT,
 	B3G_CONTROL,
 	B3G_ALT,
-	B3G_RETURN
+	B3G_RETURN,
 };
 
 #if PY_MAJOR_VERSION >= 3
@@ -10913,6 +10964,8 @@ initpybullet(void)
 	PyModule_AddIntConstant(m, "ACTIVATION_STATE_DISABLE_SLEEPING", eActivationStateDisableSleeping);
 	PyModule_AddIntConstant(m, "ACTIVATION_STATE_WAKE_UP", eActivationStateWakeUp);
 	PyModule_AddIntConstant(m, "ACTIVATION_STATE_SLEEP", eActivationStateSleep);
+	PyModule_AddIntConstant(m, "ACTIVATION_STATE_ENABLE_WAKEUP", eActivationStateEnableWakeup);
+	PyModule_AddIntConstant(m, "ACTIVATION_STATE_DISABLE_WAKEUP", eActivationStateDisableWakeup);
 
 	PyModule_AddIntConstant(m, "URDF_USE_SELF_COLLISION", URDF_USE_SELF_COLLISION);
 	PyModule_AddIntConstant(m, "URDF_USE_SELF_COLLISION_EXCLUDE_PARENT", URDF_USE_SELF_COLLISION_EXCLUDE_PARENT);
@@ -10954,6 +11007,7 @@ initpybullet(void)
 	PyModule_AddIntConstant(m, "B3G_CONTROL", B3G_CONTROL);
 	PyModule_AddIntConstant(m, "B3G_ALT", B3G_ALT);
 	PyModule_AddIntConstant(m, "B3G_RETURN", B3G_RETURN);
+	PyModule_AddIntConstant(m, "B3G_SPACE", B3G_SPACE);
 
 	PyModule_AddIntConstant(m, "GEOM_SPHERE", GEOM_SPHERE);
 	PyModule_AddIntConstant(m, "GEOM_BOX", GEOM_BOX);

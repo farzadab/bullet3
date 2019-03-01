@@ -1047,6 +1047,7 @@ B3_SHARED_API int b3GetJointStateMultiDof(b3PhysicsClientHandle physClient, b3Sh
 				for (int i = 0; i < state->m_uDofSize; i++)
 				{
 					state->m_jointVelocity[i] = status->m_sendActualStateArgs.m_actualStateQdot[info.m_uIndex+i];
+					state->m_jointMotorTorqueMultiDof[i] = status->m_sendActualStateArgs.m_jointMotorForceMultiDof[info.m_uIndex + i];
 				}
 			}
 			else
@@ -1058,7 +1059,7 @@ B3_SHARED_API int b3GetJointStateMultiDof(b3PhysicsClientHandle physClient, b3Sh
 			{
 				state->m_jointReactionForceTorque[ii] = status->m_sendActualStateArgs.m_jointReactionForces[6 * jointIndex + ii];
 			}
-			state->m_jointMotorTorque = status->m_sendActualStateArgs.m_jointMotorForce[jointIndex];
+			
 			return 1;
 		}
 	}
@@ -1604,7 +1605,26 @@ B3_SHARED_API b3SharedMemoryCommandHandle b3CreateMultiBodyCommandInit(b3Physics
 		command->m_createMultiBodyArgs.m_bodyName[0] = 0;
 		command->m_createMultiBodyArgs.m_baseLinkIndex = -1;
 		command->m_createMultiBodyArgs.m_numLinks = 0;
+		command->m_createMultiBodyArgs.m_numBatchObjects = 0;
 		return (b3SharedMemoryCommandHandle)command;
+	}
+	return 0;
+}
+
+//batch creation is an performance feature to create a large number of multi bodies in one command
+B3_SHARED_API int b3CreateMultiBodySetBatchPositions(b3PhysicsClientHandle physClient, b3SharedMemoryCommandHandle commandHandle, double* batchPositions, int numBatchObjects)
+{
+	struct SharedMemoryCommand* command = (struct SharedMemoryCommand*)commandHandle;
+	b3Assert(command);
+	b3Assert(command->m_type == CMD_CREATE_MULTI_BODY);
+	PhysicsClient* cl = (PhysicsClient*)physClient;
+	b3Assert(cl);
+	b3Assert(cl->canSubmitCommand());
+	
+	if (cl && command->m_type == CMD_CREATE_MULTI_BODY)
+	{
+		command->m_createMultiBodyArgs.m_numBatchObjects = numBatchObjects;
+		cl->uploadBulletFileToSharedMemory((const char*)batchPositions, sizeof(double) * 3 * numBatchObjects);
 	}
 	return 0;
 }
@@ -2830,6 +2850,18 @@ B3_SHARED_API int b3ChangeDynamicsInfoSetAngularDamping(b3SharedMemoryCommandHan
 	command->m_updateFlags |= CHANGE_DYNAMICS_INFO_SET_ANGULAR_DAMPING;
 	return 0;
 }
+
+B3_SHARED_API int b3ChangeDynamicsInfoSetJointDamping(b3SharedMemoryCommandHandle commandHandle, int bodyUniqueId, int linkIndex, double jointDamping)
+{
+	struct SharedMemoryCommand* command = (struct SharedMemoryCommand*)commandHandle;
+	b3Assert(command->m_type == CMD_CHANGE_DYNAMICS_INFO);
+	command->m_changeDynamicsInfoArgs.m_bodyUniqueId = bodyUniqueId;
+	command->m_changeDynamicsInfoArgs.m_linkIndex = linkIndex;
+	command->m_changeDynamicsInfoArgs.m_jointDamping = jointDamping;
+	command->m_updateFlags |= CHANGE_DYNAMICS_INFO_SET_JOINT_DAMPING;
+	return 0;
+}
+
 
 B3_SHARED_API int b3ChangeDynamicsInfoSetContactStiffnessAndDamping(b3SharedMemoryCommandHandle commandHandle, int bodyUniqueId, int linkIndex, double contactStiffness, double contactDamping)
 {
